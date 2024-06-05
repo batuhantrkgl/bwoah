@@ -11,8 +11,8 @@ const { DOMParser } = require('xmldom');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('last-grandprix')
-        .setDescription('Get the details of the last Grand Prix')
+        .setName('next-grandprix')
+        .setDescription('Get the details of the next Grand Prix')
         .addStringOption(option =>
             option.setName('category')
                 .setDescription('Select the motorsport category you want to get the last Grand Prix for.')
@@ -39,11 +39,11 @@ module.exports = {
             const currentDate = new Date();
             const sortedRaces = jsonContent.races.filter(race => {
                 const raceDate = new Date(race.sessions.gp || race.sessions.feature || race.sessions.race2 || race.sessions.race);
-                return raceDate <= currentDate;
+                return raceDate > currentDate;
             }).sort((a, b) => {
                 const dateA = new Date(a.sessions.gp || a.sessions.feature || a.sessions.race2 || a.sessions.race);
                 const dateB = new Date(b.sessions.gp || b.sessions.feature || b.sessions.race2 || b.sessions.race);
-                return dateB - dateA;
+                return dateA - dateB;
             });
 
             if (!sortedRaces.length) {
@@ -55,7 +55,7 @@ module.exports = {
 
             let image = '';
             if (['f1', 'f1-academy', 'f2', 'f3'].includes(motorsport)) {
-                image = `https://media.formula1.com/image/upload/f_auto/q_auto/v1677244985/content/dam/fom-website/2018-redesign-assets/Circuit%20maps%2016x9/${closestRace.name.replace('Monaco', 'Monoco')}_Circuit.png.transform/8col/image.png`;
+                image = `https://media.formula1.com/image/upload/f_auto/q_auto/v1677244985/content/dam/fom-website/2018-redesign-assets/Circuit%20maps%2016x9/${closestRace.name.replace('Monaco', 'Monoco').replace('Canadian', 'Canada').replace('Spanish', 'Spain').replace('Barcelona', 'Spain')}_Circuit.png.transform/8col/image.png`;
             } else if (motorsport === 'fe') {
                 const locationKey = closestRace.location.toLowerCase();
                 image = formula_e[locationKey] || '';
@@ -112,6 +112,7 @@ module.exports = {
             const fp2Formatted = formatDateTime(closestRace.sessions.fp2);
             const fp3Formatted = formatDateTime(closestRace.sessions.fp3);
             const qualiFormatted = formatDateTime(closestRace.sessions.qualifying);
+            const quali1Formatted = formatDateTime(closestRace.sessions.qualifying1);
             const quali2Formatted = formatDateTime(closestRace.sessions.qualifying2);
 
             let gpFormatted = '';
@@ -125,23 +126,6 @@ module.exports = {
                 gpFormatted = formatDateTime(closestRace.sessions.race2 || closestRace.sessions.race1);
             }
             
-
-            let winnerDriver = 'Not Available';
-            let winnerEmoji = '';
-            if (motorsport === 'f1') {
-                try {
-                    const winnerResponse = await fetch(`https://api.openf1.org/v1/position?session_key=latest&meeting_key=latest&position%3C=1`);
-                    const winnerData = await winnerResponse.json();
-                    if (winnerData.length > 0) {
-                        const winnerNumber = winnerData[0].driver_number;
-                        winnerDriver = Object.keys(drivers).find(driver => drivers[driver] === winnerNumber) || 'Unknown';
-                        winnerEmoji = emojis[winnerNumber] || '';
-                    }
-                } catch (error) {
-                    console.error('Error fetching winner data:', error);
-                }
-            }
-
             let qualiFilter = '';
             if (motorsport === 'motogp') {
                 qualiFilter = formatDateTime(closestRace.sessions.qualifying2)
@@ -159,7 +143,6 @@ module.exports = {
                     { name: "Name", value: `${closestRace.name}`, inline: true },
                     { name: "Qualifying", value: `${qualiFilter}`, inline: true },
                     { name: "Grand Prix", value: `${gpFormatted}`, inline: true },
-                    { name: "Winner", value: `${winnerEmoji} ${winnerDriver}`, inline: true }
                 )
                 .setImage(imageUrl)
                 .setFooter({ text: `${motorsport.toUpperCase()} - ${closestRace.name}` });
