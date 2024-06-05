@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const drivers = require('../../json/drivers.json');
 const emojis = require('../../json/emojis.json');
 const colors = require('../../json/colors.json');
@@ -6,7 +6,8 @@ const formula_e = require('../../json/formula_e.json');
 const indycar = require('../../json/indycar.json');
 const motogp = require('../../json/motogp.json');
 const db = require('orio.db');
-
+const { createCanvas, loadImage } = require('canvas');
+const { DOMParser } = require('xmldom');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -17,18 +18,20 @@ module.exports = {
                 .setDescription('Select the motorsport category you want to get the last Grand Prix for.')
                 .setRequired(true)
                 .addChoices(
-                    { name: 'Formula 1', value: 'f1' }, // Formula 1
-                    { name: 'Formula 1 Academy', value: 'f1-academy' }, // Formula 1 Academy
-                    { name: 'Formula 2', value: 'f2' }, // Formula 2
-                    { name: 'Formula 3', value: 'f3' }, // Formula 3
-                    { name: 'Formula E', value: 'fe' }, // Formula E
-                    { name: 'IndyCar', value: 'indycar' }, // IndyCar
-                    { name: 'MotoGP', value: 'motogp' }, // MotoGP
+                    { name: 'Formula 1', value: 'f1' },
+                    { name: 'Formula 1 Academy', value: 'f1-academy' },
+                    { name: 'Formula 2', value: 'f2' },
+                    { name: 'Formula 3', value: 'f3' },
+                    { name: 'Formula E', value: 'fe' },
+                    { name: 'IndyCar', value: 'indycar' },
+                    { name: 'MotoGP', value: 'motogp' },
                 )),
     async execute(interaction) {
         const motorsport = interaction.options.getString('category');
         const year = new Date().getFullYear();
         const url = `https://raw.githubusercontent.com/sportstimes/f1/main/_db/${motorsport}/${year}.json`;
+
+        await interaction.deferReply();  // Defer the reply to give more time for processing
 
         try {
             const response = await fetch(url);
@@ -44,7 +47,7 @@ module.exports = {
             });
 
             if (!sortedRaces.length) {
-                return interaction.reply('No Grand Prix data available for the selected category.');
+                return interaction.editReply('No Grand Prix data available for the selected category.');
             }
 
             const closestRace = sortedRaces[0];
@@ -64,6 +67,39 @@ module.exports = {
                 image = motogp[locationKey] || '';
             }
 
+            // Function to convert SVG to PNG with specified dimensions
+            async function svgToPng(svgUrl, width, height) {
+                const response = await fetch(svgUrl);
+                const svgText = await response.text();
+
+                // Parse the SVG text and update its width and height attributes
+                const parser = new DOMParser();
+                const svgDoc = parser.parseFromString(svgText, 'image/svg+xml');
+                const svgElement = svgDoc.documentElement;
+
+                svgElement.setAttribute('width', width);
+                svgElement.setAttribute('height', height);
+
+                const updatedSvgText = svgElement.toString();
+                const img = await loadImage('data:image/svg+xml;base64,' + Buffer.from(updatedSvgText).toString('base64'));
+
+                const canvas = createCanvas(width, height);
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                return canvas.toBuffer('image/png');
+            }
+
+            let imageUrl;
+            let attachment = null;
+            if (image.endsWith('.svg')) {
+                const pngBuffer = await svgToPng(image, 1024, 512);
+                attachment = new AttachmentBuilder(pngBuffer, { name: 'track.png' });
+                imageUrl = 'attachment://track.png';
+            } else {
+                imageUrl = image;
+            }
+
             const formatDateTime = (dateString) => {
                 if (!dateString) return 'N/A';
                 const date = new Date(dateString);
@@ -76,19 +112,20 @@ module.exports = {
             const fp2Formatted = formatDateTime(closestRace.sessions.fp2);
             const fp3Formatted = formatDateTime(closestRace.sessions.fp3);
             const qualiFormatted = formatDateTime(closestRace.sessions.qualifying);
+            const quali2Formatted = formatDateTime(closestRace.sessions.qualifying2);
             let gpFormatted = '';
 
             if (motorsport === 'f1') {
                 gpFormatted = formatDateTime(closestRace.sessions.gp);
-            } else if (['f2', 'f3', 'motogp', 'indycar'].includes(motorsport)) {
+            } else if (['f2', 'f3', 'indycar'].includes(motorsport)) {
                 gpFormatted = formatDateTime(closestRace.sessions.feature);
-            } else if (motorsport === 'fe') {
+            } else if (motorsport === 'fe', 'motogp') {
                 gpFormatted = formatDateTime(closestRace.sessions.race);
             } else if (motorsport === 'f1-academy') {
                 gpFormatted = formatDateTime(closestRace.sessions.race2);
             }
 
-            let winnerDriver = 'Not Avabile.';
+            let winnerDriver = 'Not Available';
             let winnerEmoji = '';
             if (motorsport === 'f1') {
                 try {
@@ -104,18 +141,24 @@ module.exports = {
                 }
             }
 
+            let qualiFilter = '';
+            if (motorsport === 'motogp') {
+                qualiFilter = formatDateTime(closestRace.sessions.qualifying2)
+            } else  {
+                qualiFilter = formatDateTime(closestRace.sessions.qualifying)
+            } 
             const embed = new EmbedBuilder()
                 .setColor(colors[motorsport])
                 .setAuthor({ name: `${closestRace.slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}` })
                 .addFields(
-                    { name: "Round", value: `${closestRace.round}`, inline: true},
-                    { name: "Location", value: `${closestRace.location}`, inline: true},
-                    { name: "Name", value: `${closestRace.name}`, inline: true},
-                    { name: "Qualifying", value: `${qualiFormatted}`, inline: true},
-                    { name: "Grand Prix", value: `${gpFormatted}`, inline: true},
-                    { name: "Winner", value: `${winnerEmoji} ${winnerDriver}`, inline: true}
+                    { name: "Round", value: `${closestRace.round}`, inline: true },
+                    { name: "Location", value: `${closestRace.location}`, inline: true },
+                    { name: "Name", value: `${closestRace.name}`, inline: true },
+                    { name: "Qualifying", value: `${qualiFilter}`, inline: true },
+                    { name: "Grand Prix", value: `${gpFormatted}`, inline: true },
+                    { name: "Winner", value: `${winnerEmoji} ${winnerDriver}`, inline: true }
                 )
-                .setImage(image)
+                .setImage(imageUrl)
                 .setFooter({ text: `${motorsport.toUpperCase()} - ${closestRace.name}` });
 
             if (motorsport === 'f1') {
@@ -126,11 +169,11 @@ module.exports = {
                 );
             }
 
-            interaction.reply({ embeds: [embed] });
+            await interaction.editReply({ embeds: [embed], files: attachment ? [attachment] : [] });
 
         } catch (error) {
             console.error('Error fetching Grand Prix data:', error);
-            interaction.reply('There was an error fetching the Grand Prix data.');
+            await interaction.editReply('There was an error fetching the Grand Prix data.');
         }
     }
 };
