@@ -108,6 +108,9 @@ module.exports = {
                 return `${dateStringFormatted}, ${timeStringFormatted}`;
             };
 
+            const practiceFormatted = formatDateTime(closestRace.sessions.practice);
+            const practice1Formatted = formatDateTime(closestRace.sessions.practice1);
+            const practice2Formatted = formatDateTime(closestRace.sessions.practice2);
             const fp1Formatted = formatDateTime(closestRace.sessions.fp1);
             const fp2Formatted = formatDateTime(closestRace.sessions.fp2);
             const fp3Formatted = formatDateTime(closestRace.sessions.fp3);
@@ -151,29 +154,50 @@ module.exports = {
                 qualiFilter = formatDateTime(closestRace.sessions.qualifying)
             } 
             const embed = new EmbedBuilder()
-                .setColor(colors[motorsport])
-                .setAuthor({ name: `${closestRace.slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}` })
-                .addFields(
-                    { name: "Round", value: `${closestRace.round}`, inline: true },
-                    { name: "Location", value: `${closestRace.location}`, inline: true },
-                    { name: "Name", value: `${closestRace.name}`, inline: true },
-                    { name: "Qualifying", value: `${qualiFilter}`, inline: true },
-                    { name: "Grand Prix", value: `${gpFormatted}`, inline: true },
-                    { name: "Winner", value: `${winnerEmoji} ${winnerDriver}`, inline: true }
-                )
-                .setImage(imageUrl)
-                .setFooter({ text: `${motorsport.toUpperCase()} - ${closestRace.name}` });
+    .setColor(colors[motorsport])
+    .setAuthor({ name: `${closestRace.slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}` })
+    .addFields(
+        { name: "Round", value: `${closestRace.round}`, inline: true },
+        { name: "Name", value: `${closestRace.slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`, inline: true },
+        { name: "Location", value: `${closestRace.location}`, inline: true },
+    )
+    .setImage(imageUrl)
+    .setFooter({ text: `${motorsport.toUpperCase()} - ${closestRace.name}` });
 
-            if (motorsport === 'f1') {
-                embed.addFields(
-                    { name: "Free Practice 1", value: `${fp1Formatted}`, inline: true },
-                    { name: "Free Practice 2", value: `${fp2Formatted}`, inline: true },
-                    { name: "Free Practice 3", value: `${fp3Formatted}`, inline: true }
-                );
-            }
+if (motorsport === 'f2' || motorsport === 'f3') {
+    embed.addFields(
+        { name: "Practice", value: `${practiceFormatted}`, inline: true },
+    )
+} else if (motorsport === 'fe' || motorsport === 'indycar') {
+    embed.addFields(
+        { name: "Practice 1", value: `${practice1Formatted}`, inline: true },
+        { name: "Practice 2", value: `${practice2Formatted}`, inline: true },
+    )
+} else if (motorsport === 'motogp' || motorsport === "f1-academy") {
+    embed.addFields(
+        { name: "Practice 1", value: `${fp1Formatted}`, inline: true },
+        { name: "Practice 2", value: `${fp2Formatted}`, inline: true },
+    )
+} else if (motorsport === 'f1') {
+    embed.addFields(
+        { name: "Free Practice 1", value: `${fp1Formatted}`, inline: true },
+        { name: "Free Practice 2", value: `${fp2Formatted}`, inline: true },
+        { name: "Free Practice 3", value: `${fp3Formatted}`, inline: true }
+    );
+}
 
-            await interaction.editReply({ embeds: [embed], files: attachment ? [attachment] : [] });
+embed.addFields(
+    { name: "Qualifying", value: `${qualiFilter}`, inline: true },
+    { name: "Grand Prix", value: `${gpFormatted}`, inline: true },
+);
 
+if (motorsport === 'f1') {
+    embed.addFields(
+        { name: "Winner", value: `${winnerEmoji} ${winnerDriver}`, inline: true }
+    );
+}
+
+await interaction.editReply({ embeds: [embed], files: attachment ? [attachment] : [] });
         } catch (error) {
             console.error('Error fetching Grand Prix data:', error);
             await interaction.editReply('There was an error fetching the Grand Prix data.');

@@ -135,25 +135,30 @@ module.exports = {
                 qualiFilter = formatDateTime(closestRace.sessions.qualifying)
             } 
             const embed = new EmbedBuilder()
-                .setColor(colors[motorsport])
-                .setAuthor({ name: `${closestRace.slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}` })
-                .addFields(
-                    { name: "Round", value: `${closestRace.round}`, inline: true },
-                    { name: "Location", value: `${closestRace.location}`, inline: true },
-                    { name: "Name", value: `${closestRace.name}`, inline: true },
-                    { name: "Qualifying", value: `${qualiFilter}`, inline: true },
-                    { name: "Grand Prix", value: `${gpFormatted}`, inline: true },
-                )
-                .setImage(imageUrl)
-                .setFooter({ text: `${motorsport.toUpperCase()} - ${closestRace.name}` });
-
-            if (motorsport === 'f1') {
-                embed.addFields(
-                    { name: "Free Practice 1", value: `${fp1Formatted}`, inline: true },
-                    { name: "Free Practice 2", value: `${fp2Formatted}`, inline: true },
-                    { name: "Free Practice 3", value: `${fp3Formatted}`, inline: true }
-                );
-            }
+            .setColor(colors[motorsport])
+            .setAuthor({ name: `${closestRace.slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}` })
+            .addFields(
+                { name: "Round", value: `${closestRace.round}`, inline: true },
+                { name: "Name", value: `${closestRace.slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`, inline: true },
+                { name: "Location", value: `${closestRace.location}`, inline: true },
+            )
+            .setImage(imageUrl)
+            .setFooter({ text: `${motorsport.toUpperCase()} - ${closestRace.name}` });
+        
+        if (motorsport === 'f1') {
+            embed.addFields(
+                { name: "Free Practice 1", value: `${fp1Formatted}`, inline: true },
+                { name: "Free Practice 2", value: `${fp2Formatted}`, inline: true },
+                { name: "Free Practice 3", value: `${fp3Formatted}`, inline: true }
+            );
+        }
+        
+        embed.addFields(
+            { name: "Qualifying", value: `${qualiFilter}`, inline: true },
+            { name: "Grand Prix", value: `${gpFormatted}`, inline: true },
+        );
+        
+        await interaction.editReply({ embeds: [embed], files: attachment ? [attachment] : [] });
 
             await interaction.editReply({ embeds: [embed], files: attachment ? [attachment] : [] });
 
