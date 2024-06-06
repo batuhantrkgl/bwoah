@@ -140,11 +140,15 @@ module.exports = {
             .addFields(
                 { name: "Round", value: `${closestRace.round}`, inline: true },
                 { name: "Name", value: `${closestRace.slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`, inline: true },
-                { name: "Location", value: `${closestRace.location}`, inline: true },
             )
             .setImage(imageUrl)
             .setFooter({ text: `${motorsport.toUpperCase()} - ${closestRace.name}` });
-        
+            
+        if (motorsport === 'indycar') {
+        } else {
+            embed.addFields({ name: "Location", value: `${closestRace.location}`, inline: true })
+        }
+
         if (motorsport === 'f1') {
             embed.addFields(
                 { name: "Free Practice 1", value: `${fp1Formatted}`, inline: true },
