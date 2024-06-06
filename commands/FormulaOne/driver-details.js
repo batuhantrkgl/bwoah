@@ -1,5 +1,4 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { getCode, getName } = require('country-list');
 
 module.exports = {
     data: new SlashCommandBuilder()
