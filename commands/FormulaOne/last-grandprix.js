@@ -132,17 +132,24 @@ module.exports = {
             let winnerDriver = 'Not Available';
             let winnerEmoji = '';
             if (motorsport === 'f1') {
-                try {
+                const response = await fetch(`https://raw.githubusercontent.com/sportstimes/f1/main/_db/f1/${year}.json`);
+                const f1Data = await response.json();
+                const dates = f1Data.races.map(async race => {    
+                    const currentDate = new Date();
+                    if (currentDate == race.sessions.gp || race.sessions.fp1 || race.sessions.fp2 || race.sessions.fp3 || race.sessions.qualifying) {
+                        winnerDriverNumber = db.get("formula-one-last-grandprix-winner")
+                        winnerDriver = Object.keys(drivers).find(driver => drivers[driver] === winnerDriverNumber) || 'Not Avabile.';
+                        winnerEmoji = emojis[winnerDriverNumber] || '';
+                } else {
                     const winnerResponse = await fetch(`https://api.openf1.org/v1/position?session_key=latest&meeting_key=latest&position%3C=1`);
                     const winnerData = await winnerResponse.json();
                     if (winnerData.length > 0) {
                         const winnerNumber = winnerData[0].driver_number;
                         winnerDriver = Object.keys(drivers).find(driver => drivers[driver] === winnerNumber) || 'Unknown';
                         winnerEmoji = emojis[winnerNumber] || '';
-                    }
-                } catch (error) {
-                    console.error('Error fetching winner data:', error);
-                }
+                        db.set("formula-one-last-grandprix-winner", winnerNumber)
+                     }
+                }})
             }
 
             let qualiFilter = '';
