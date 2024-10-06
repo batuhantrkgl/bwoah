@@ -37,9 +37,36 @@ module.exports = {
             const response = await fetch(url);
             const jsonContent = await response.json();
             const currentDate = new Date();
+
+            // Check if there's a current Grand Prix
+            const ongoingRace = jsonContent.races.some(race => {
+                const sessionDates = [
+                    race.sessions.gp,
+                    race.sessions.feature,
+                    race.sessions.race2,
+                    race.sessions.race,
+                ].filter(Boolean).map(session => new Date(session));
+                
+                // Assuming each race session lasts a certain duration, e.g., 2 hours (7200000 ms)
+                const raceDuration = 7200000; // 2 hours in milliseconds
+                return sessionDates.some(sessionDate => {
+                    return sessionDate <= currentDate && currentDate < (sessionDate.getTime() + raceDuration);
+                });
+            });
+
+            if (ongoingRace) {
+                return await interaction.editReply("There's a Grand Prix going on already!");
+            }
+
             const sortedRaces = jsonContent.races.filter(race => {
-                const raceDate = new Date(race.sessions.gp || race.sessions.feature || race.sessions.race2 || race.sessions.race);
-                return raceDate <= currentDate;
+                const sessionDates = [
+                    race.sessions.gp,
+                    race.sessions.feature,
+                    race.sessions.race2,
+                    race.sessions.race,
+                ].filter(Boolean).map(session => new Date(session));
+                
+                return sessionDates.some(sessionDate => sessionDate <= currentDate);
             }).sort((a, b) => {
                 const dateA = new Date(a.sessions.gp || a.sessions.feature || a.sessions.race2 || a.sessions.race);
                 const dateB = new Date(b.sessions.gp || b.sessions.feature || b.sessions.race2 || b.sessions.race);
@@ -47,7 +74,7 @@ module.exports = {
             });
 
             if (!sortedRaces.length) {
-                return interaction.editReply('No Grand Prix data available for the selected category.');
+                return await interaction.editReply('No Grand Prix data available for the selected category.');
             }
 
             const closestRace = sortedRaces[0];
@@ -118,96 +145,93 @@ module.exports = {
             const quali2Formatted = formatDateTime(closestRace.sessions.qualifying2);
 
             let gpFormatted = '';
-            if (motorsport == 'f1') {
+            if (motorsport === 'f1') {
                 gpFormatted = formatDateTime(closestRace.sessions.gp);
             } else if (['f2', 'f3'].includes(motorsport)) {
                 gpFormatted = formatDateTime(closestRace.sessions.feature);
             } else if (['fe', 'motogp', 'indycar'].includes(motorsport)) {
                 gpFormatted = formatDateTime(closestRace.sessions.race);
-            } else if (motorsport == 'f1-academy') {
+            } else if (motorsport === 'f1-academy') {
                 gpFormatted = formatDateTime(closestRace.sessions.race2 || closestRace.sessions.race1);
             }
-            
 
             let winnerDriver = 'Not Available';
             let winnerEmoji = '';
+            
             if (motorsport === 'f1') {
-                const response = await fetch(`https://raw.githubusercontent.com/sportstimes/f1/main/_db/f1/${year}.json`);
-                const f1Data = await response.json();
-                const dates = f1Data.races.map(async race => {    
-                    const currentDate = new Date();
-                    if (currentDate == race.sessions.gp || race.sessions.fp1 || race.sessions.fp2 || race.sessions.fp3 || race.sessions.qualifying) {
-                        winnerDriverNumber = db.get("formula-one-last-grandprix-winner")
-                        winnerDriver = Object.keys(drivers).find(driver => drivers[driver] === winnerDriverNumber) || 'Not Avabile.';
-                        winnerEmoji = emojis[winnerDriverNumber] || '';
-                } else {
+                try {
                     const winnerResponse = await fetch(`https://api.openf1.org/v1/position?session_key=latest&meeting_key=latest&position%3C=1`);
                     const winnerData = await winnerResponse.json();
+                    
                     if (winnerData.length > 0) {
                         const winnerNumber = winnerData[0].driver_number;
                         winnerDriver = Object.keys(drivers).find(driver => drivers[driver] === winnerNumber) || 'Unknown';
                         winnerEmoji = emojis[winnerNumber] || '';
-                        db.set("formula-one-last-grandprix-winner", winnerNumber)
-                     }
-                }})
+                        db.set("formula-one-last-grandprix-winner", winnerNumber);
+                    }
+                } catch (apiError) {
+                    console.error('Error fetching winner data:', apiError);
+                }
             }
+            
 
             let qualiFilter = '';
             if (motorsport === 'motogp') {
-                qualiFilter = formatDateTime(closestRace.sessions.qualifying2)
+                qualiFilter = formatDateTime(closestRace.sessions.qualifying2);
             } else if (motorsport === 'f1-academy') {
-                qualiFilter = formatDateTime(closestRace.sessions.qualifying2 || closestRace.sessions.qualifying1)
+                qualiFilter = formatDateTime(closestRace.sessions.qualifying2 || closestRace.sessions.qualifying1);
             } else {
-                qualiFilter = formatDateTime(closestRace.sessions.qualifying)
-            } 
+                qualiFilter = formatDateTime(closestRace.sessions.qualifying);
+            }
+
             const embed = new EmbedBuilder()
-    .setColor(colors[motorsport])
-    .setAuthor({ name: `${closestRace.slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}` })
-    .addFields(
-        { name: "Round", value: `${closestRace.round}`, inline: true },
-        { name: "Name", value: `${closestRace.slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`, inline: true },
-    )
-    .setImage(imageUrl)
-    .setFooter({ text: `${motorsport.toUpperCase()} - ${closestRace.name}` });
-if (motorsport === 'indycar') {
-} else {
-    embed.addFields({ name: "Location", value: `${closestRace.location}`, inline: true })
-}
+                .setColor(colors[motorsport])
+                .setAuthor({ name: `${closestRace.slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}` })
+                .addFields(
+                    { name: "Round", value: `${closestRace.round}`, inline: true },
+                    { name: "Name", value: `${closestRace.slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`, inline: true },
+                )
+                .setImage(imageUrl)
+                .setFooter({ text: `${motorsport.toUpperCase()} - ${closestRace.name}` });
 
-if (motorsport === 'f2' || motorsport === 'f3') {
-    embed.addFields(
-        { name: "Practice", value: `${practiceFormatted}`, inline: true },
-    )
-} else if (motorsport === 'fe' || motorsport === 'indycar') {
-    embed.addFields(
-        { name: "Practice 1", value: `${practice1Formatted}`, inline: true },
-        { name: "Practice 2", value: `${practice2Formatted}`, inline: true },
-    )
-} else if (motorsport === 'motogp' || motorsport === "f1-academy") {
-    embed.addFields(
-        { name: "Practice 1", value: `${fp1Formatted}`, inline: true },
-        { name: "Practice 2", value: `${fp2Formatted}`, inline: true },
-    )
-} else if (motorsport === 'f1') {
-    embed.addFields(
-        { name: "Free Practice 1", value: `${fp1Formatted}`, inline: true },
-        { name: "Free Practice 2", value: `${fp2Formatted}`, inline: true },
-        { name: "Free Practice 3", value: `${fp3Formatted}`, inline: true }
-    );
-}
+            if (motorsport !== 'indycar') {
+                embed.addFields({ name: "Location", value: `${closestRace.location}`, inline: true });
+            }
 
-embed.addFields(
-    { name: "Qualifying", value: `${qualiFilter}`, inline: true },
-    { name: "Grand Prix", value: `${gpFormatted}`, inline: true },
-);
+            if (motorsport === 'f2' || motorsport === 'f3') {
+                embed.addFields(
+                    { name: "Practice", value: `${practiceFormatted}`, inline: true },
+                );
+            } else if (motorsport === 'fe' || motorsport === 'indycar') {
+                embed.addFields(
+                    { name: "Practice 1", value: `${practice1Formatted}`, inline: true },
+                    { name: "Practice 2", value: `${practice2Formatted}`, inline: true },
+                );
+            } else if (motorsport === 'motogp' || motorsport === "f1-academy") {
+                embed.addFields(
+                    { name: "Practice 1", value: `${fp1Formatted}`, inline: true },
+                    { name: "Practice 2", value: `${fp2Formatted}`, inline: true },
+                );
+            } else if (motorsport === 'f1') {
+                embed.addFields(
+                    { name: "Free Practice 1", value: `${fp1Formatted}`, inline: true },
+                    { name: "Free Practice 2", value: `${fp2Formatted}`, inline: true },
+                    { name: "Free Practice 3", value: `${fp3Formatted}`, inline: true }
+                );
+            }
 
-if (motorsport === 'f1') {
-    embed.addFields(
-        { name: "Winner", value: `${winnerEmoji} ${winnerDriver}`, inline: true }
-    );
-}
+            embed.addFields(
+                { name: "Qualifying", value: `${qualiFilter}`, inline: true },
+                { name: "Grand Prix", value: `${gpFormatted}`, inline: true },
+            );
 
-await interaction.editReply({ embeds: [embed], files: attachment ? [attachment] : [] });
+            if (motorsport === 'f1') {
+                embed.addFields(
+                    { name: "Winner", value: `${winnerEmoji} ${winnerDriver}`, inline: true }
+                );
+            }
+
+            await interaction.editReply({ embeds: [embed], files: attachment ? [attachment] : [] });
         } catch (error) {
             console.error('Error fetching Grand Prix data:', error);
             await interaction.editReply('There was an error fetching the Grand Prix data.');
