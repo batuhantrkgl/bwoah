@@ -33,7 +33,7 @@ Access the complete schedule of all races for the year with a single command. Id
 
 ### Prerequisites
 - [Node.js](https://nodejs.org/) (v14 or higher)
-- A Discord bot token (create your bot at the [Discord Developer Portal](https://discord.com/developers/applications))
+- A Discord bot token and clientId (create your bot at the [Discord Developer Portal](https://discord.com/developers/applications))
 
 ### Steps
 1. **Clone the repository**:
@@ -43,14 +43,29 @@ Access the complete schedule of all races for the year with a single command. Id
     ```
 
 2. **Install dependencies**:
+    
+    
+    For Ubuntu/Debian:
+    ```bash
+    sudo apt-get install build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+    ```
+    For Fedora:
+    ```bash
+    sudo dnf install gcc-c++ cairo-devel pango-devel libjpeg-turbo-devel giflib-devel librsvg2-devel pixman-devel
+    ```
+    For Arch Linux:
+    ```bash
+    sudo pacman -S gcc cairo pango libjpeg-turbo giflib librsvg pixman
+    ```    
+    Install NodeJS Dependencies
     ```bash
     npm install
     ```
 
-3. **Create a `.env` file** in the root directory and add your bot token:
+3. **Create a `.env` file** in the root directory and add your bot token and clientId:
     ```
     TOKEN=YOUR_BOT_TOKEN
-    clientId:YOUR_BOT_CLIENTID
+    clientId=YOUR_BOT_CLIENTID
     ```
 
 4. **Start the bot**:
