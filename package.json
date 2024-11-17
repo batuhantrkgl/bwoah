@@ -1,29 +1,5 @@
 {
-  "name": "bwoah",
-  "version": "1.1.0",
-  "description": "Discord Bot for Racing Schedule.",
-  "main": "index.js",
-  "scripts": {
-    "test": "node index.js"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/batuhantrkgl/bwoah.git"
-  },
-  "author": "Batuhan Türkoğlu",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/batuhantrkgl/bwoah/issues"
-  },
-  "homepage": "https://github.com/batuhantrkgl/bwoah#readme",
   "dependencies": {
-    "@types/node": "^20.12.13",
-    "canvas": "^2.11.2",
-    "discord.js": "^14.15.2",
-    "dotenv": "^16.4.5",
-    "node": "^20.14.0",
-    "node-fetch": "^3.3.2",
-    "orio.db": "^3.1.2",
-    "xmldom": "^0.6.0"
+    "http-server": "^14.1.1"
   }
 }

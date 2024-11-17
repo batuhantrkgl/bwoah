@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terms of Service and Privacy Policy</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background-color: #4CAF50;
+            color: white;
+            padding: 1em;
+            text-align: center;
+        }
+        nav {
+            margin: 0;
+            padding: 1em;
+            background-color: #f2f2f2;
+            text-align: center;
+        }
+        nav a {
+            margin: 0 1em;
+            text-decoration: none;
+            color: #333;
+        }
+        section {
+            padding: 2em;
+        }
+    </style>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<body>
+    <header>
+        <h1>Our Policies</h1>
+    </header>
+    <nav>
+        <a href="#terms">Terms of Service</a>
+        <a href="#privacy">Privacy Policy</a>
+    </nav>
+    <section id="terms">
+        <div id="terms-content"></div>
+    </section>
+    <section id="privacy">
+        <div id="privacy-content"></div>
+    </section>
+    <script>
+        async function fetchMarkdown(file, elementId) {
+            const response = await fetch(file);
+            const text = await response.text();
+            document.getElementById(elementId).innerHTML = marked.parse(text);
+        }
+
+        fetchMarkdown('./terms.md', 'terms-content');
+        fetchMarkdown('./privacy.md', 'privacy-content');
+    </script>
+</body>
+</html>
