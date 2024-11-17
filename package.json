@@ -17,8 +17,8 @@
   },
   "homepage": "https://github.com/batuhantrkgl/bwoah#readme",
   "dependencies": {
+    "@napi-rs/canvas": "^0.1.62",
     "@types/node": "^20.12.13",
-    "canvas": "^2.11.2",
     "discord.js": "^14.15.2",
     "dotenv": "^16.4.5",
     "node": "^20.14.0",

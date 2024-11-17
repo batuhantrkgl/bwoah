@@ -6,7 +6,7 @@ const formula_e = require('../../json/formula_e.json');
 const indycar = require('../../json/indycar.json');
 const motogp = require('../../json/motogp.json');
 const db = require('orio.db');
-const { createCanvas, loadImage } = require('canvas');
+const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { DOMParser } = require('xmldom');
 
 module.exports = {

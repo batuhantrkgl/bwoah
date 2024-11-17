@@ -6,7 +6,7 @@ const formula_e = require('../../json/formula_e.json');
 const indycar = require('../../json/indycar.json');
 const motogp = require('../../json/motogp.json');
 const db = require('orio.db');
-const { createCanvas, loadImage } = require('canvas');
+const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { DOMParser } = require('xmldom');
 
 module.exports = {
@@ -55,7 +55,7 @@ module.exports = {
 
             let image = '';
             if (['f1', 'f1-academy', 'f2', 'f3'].includes(motorsport)) {
-                image = `https://media.formula1.com/image/upload/f_auto/q_auto/v1677244985/content/dam/fom-website/2018-redesign-assets/Circuit%20maps%2016x9/${closestRace.name.replace('Monaco', 'Monoco').replace('Canadian', 'Canada').replace('Spanish', 'Spain').replace('Barcelona', 'Spain')}_Circuit.png.transform/8col/image.png`;
+                image = `https://media.formula1.com/image/upload/f_auto/q_auto/v1677244985/content/dam/fom-website/2018-redesign-assets/Circuit%20maps%2016x9/${closestRace.name.replace('Monaco', 'Monoco').replace('Canadian', 'Canada').replace('Spanish', 'Spain').replace('Barcelona', 'Spain').replace('Las Vegas', 'Las_Vegas')}_Circuit.png.transform/8col/image.png`;
             } else if (motorsport === 'fe') {
                 const locationKey = closestRace.location.toLowerCase();
                 image = formula_e[locationKey] || '';
