@@ -2,8 +2,6 @@ const {
   SlashCommandBuilder,
   EmbedBuilder,
   AttachmentBuilder,
-  InteractionReplyOptions,
-  MessageFlags,
 } = require("discord.js");
 const drivers = require("../../json/drivers.json");
 const emojis = require("../../json/emojis.json");
@@ -17,8 +15,8 @@ const { DOMParser } = require("xmldom");
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("next-grandprix")
-    .setDescription("Get the details of the next Grand Prix")
+    .setName("last-grandprix")
+    .setDescription("Get the details of the last Grand Prix")
     .addStringOption((option) =>
       option
         .setName("category")
@@ -38,26 +36,55 @@ module.exports = {
     ),
   async execute(interaction) {
     const motorsport = interaction.options.getString("category");
-    let year = new Date().getFullYear();
-    let url = `https://raw.githubusercontent.com/sportstimes/f1/main/_db/${motorsport}/${year}.json`;
+    const year = new Date().getFullYear();
+    const url = `https://raw.githubusercontent.com/sportstimes/f1/main/_db/${motorsport}/${year}.json`;
 
     await interaction.deferReply(); // Defer the reply to give more time for processing
 
     try {
-      let response = await fetch(url);
-      if (!response.ok)
-        throw new Error(`Network response was not ok for URL: ${url}`);
-      let jsonContent = await response.json();
-      let currentDate = new Date();
-      let sortedRaces = jsonContent.races
-        .filter((race) => {
-          const raceDate = new Date(
-            race.sessions.gp ||
-              race.sessions.feature ||
-              race.sessions.race2 ||
-              race.sessions.race
+      const response = await fetch(url);
+      const jsonContent = await response.json();
+      const currentDate = new Date();
+
+      // Check if there's a current Grand Prix
+      const ongoingRace = jsonContent.races.some((race) => {
+        const sessionDates = [
+          race.sessions.gp,
+          race.sessions.feature,
+          race.sessions.race2,
+          race.sessions.race,
+        ]
+          .filter(Boolean)
+          .map((session) => new Date(session));
+
+        // Assuming each race session lasts a certain duration, e.g., 2 hours (7200000 ms)
+        const raceDuration = 7200000; // 2 hours in milliseconds
+        return sessionDates.some((sessionDate) => {
+          return (
+            sessionDate <= currentDate &&
+            currentDate < sessionDate.getTime() + raceDuration
           );
-          return raceDate > currentDate;
+        });
+      });
+
+      if (ongoingRace) {
+        return await interaction.editReply(
+          "There's a Grand Prix going on already!"
+        );
+      }
+
+      const sortedRaces = jsonContent.races
+        .filter((race) => {
+          const sessionDates = [
+            race.sessions.gp,
+            race.sessions.feature,
+            race.sessions.race2,
+            race.sessions.race,
+          ]
+            .filter(Boolean)
+            .map((session) => new Date(session));
+
+          return sessionDates.some((sessionDate) => sessionDate <= currentDate);
         })
         .sort((a, b) => {
           const dateA = new Date(
@@ -72,53 +99,11 @@ module.exports = {
               b.sessions.race2 ||
               b.sessions.race
           );
-          return dateA - dateB;
+          return dateB - dateA;
         });
 
-      // If no upcoming races are found for the current year, check the next year
       if (!sortedRaces.length) {
-        year += 1;
-        url = `https://raw.githubusercontent.com/sportstimes/f1/main/_db/${motorsport}/${year}.json`;
-        response = await fetch(url);
-        if (!response.ok) {
-          if (response.status === 404) {
-            return interaction.editReply({
-              content: `${motorsport.toUpperCase()} calendar for ${year} is not ready yet, check again later.`,
-              flags: MessageFlags.Ephemeral,
-            });
-          }
-          throw new Error(`Network response was not ok for URL: ${url}`);
-        }
-        jsonContent = await response.json();
-        sortedRaces = jsonContent.races
-          .filter((race) => {
-            const raceDate = new Date(
-              race.sessions.gp ||
-                race.sessions.feature ||
-                race.sessions.race2 ||
-                race.sessions.race
-            );
-            return raceDate > currentDate;
-          })
-          .sort((a, b) => {
-            const dateA = new Date(
-              a.sessions.gp ||
-                a.sessions.feature ||
-                a.sessions.race2 ||
-                a.sessions.race
-            );
-            const dateB = new Date(
-              b.sessions.gp ||
-                b.sessions.feature ||
-                b.sessions.race2 ||
-                b.sessions.race
-            );
-            return dateA - dateB;
-          });
-      }
-
-      if (!sortedRaces.length) {
-        return interaction.editReply(
+        return await interaction.editReply(
           "No Grand Prix data available for the selected category."
         );
       }
@@ -132,16 +117,10 @@ module.exports = {
 
       let image = "";
       if (["f1", "f1-academy", "f2", "f3"].includes(motorsport)) {
-        image = `https://media.formula1.com/image/upload/f_auto/q_auto/v1677244985/content/dam/fom-website/2018-redesign-assets/Circuit%20maps%2016x9/${closestRace.name
-          .replace("Monaco", "Monoco")
-          .replace("Canadian", "Canada")
-          .replace("Spanish", "Spain")
-          .replace("Barcelona", "Spain")
-          .replace("Las Vegas", "Las_Vegas")
-          .replace(
-            "Australian",
-            "Australia"
-          )}_Circuit.png.transform/8col/image.png`;
+        image = `https://media.formula1.com/image/upload/f_auto/q_auto/v1677244985/content/dam/fom-website/2018-redesign-assets/Circuit%20maps%2016x9/${closestRace.name.replace(
+          " ",
+          "_"
+        )}_Circuit.png.transform/8col/image.png`;
       } else if (motorsport === "fe") {
         const locationKey = closestRace.location.toLowerCase();
         image = formula_e[locationKey] || "";
@@ -201,8 +180,7 @@ module.exports = {
           hour: "numeric",
           minute: "numeric",
         });
-        const timestamp = `<t:${Math.floor(date.getTime() / 1000)}:R>`;
-        return `${dateStringFormatted}, ${timeStringFormatted} (${timestamp})`;
+        return `${dateStringFormatted}, ${timeStringFormatted}`;
       };
 
       const practiceFormatted = formatDateTime(closestRace.sessions.practice);
@@ -226,21 +204,57 @@ module.exports = {
         MOTOGP:
           "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Moto_Gp_logo.svg/486px-Moto_Gp_logo.svg.png",
       };
-
       let motorsportKey = motorsport.toUpperCase().replace("-", " ");
       let gpFormatted = "";
-      if (motorsport == "f1") {
+      if (motorsport === "f1") {
         gpFormatted = formatDateTime(closestRace.sessions.gp);
       } else if (["f2", "f3"].includes(motorsport)) {
         gpFormatted = formatDateTime(closestRace.sessions.feature);
       } else if (["fe", "motogp", "indycar"].includes(motorsport)) {
         gpFormatted = formatDateTime(closestRace.sessions.race);
-      } else if (motorsport == "f1-academy") {
+      } else if (motorsport === "f1-academy") {
         gpFormatted = formatDateTime(
           closestRace.sessions.race2 || closestRace.sessions.race1
         );
       }
 
+      let winnerDriver = "Not Available";
+      let winnerEmoji = "";
+
+      // Create a reverse lookup for driver numbers to driver names
+      const driverNumberToName = Object.entries(drivers).reduce(
+        (acc, [name, info]) => {
+          acc[info.id] = name;
+          return acc;
+        },
+        {}
+      );
+
+      if (motorsport === "f1") {
+        try {
+          const winnerResponse = await fetch(
+            `https://api.openf1.org/v1/position?session_key=latest&meeting_key=latest&position%3C=1`
+          );
+          if (!winnerResponse.ok) {
+            throw new Error(
+              `Network response was not ok: ${winnerResponse.statusText}`
+            );
+          }
+          const winnerData = await winnerResponse.json();
+
+          if (winnerData.length > 0) {
+            const winnerNumber = winnerData[0].driver_number;
+            winnerDriver = driverNumberToName[winnerNumber] || "Unknown";
+            winnerEmoji = drivers[winnerDriver]?.emoji_id || "";
+            db.set("formula-one-last-grandprix-winner", winnerNumber);
+            console.log(`Winner data saved: ${winnerNumber} - ${winnerDriver}`);
+          } else {
+            console.log("No winner data found.");
+          }
+        } catch (apiError) {
+          console.error("Error fetching winner data:", apiError);
+        }
+      }
       let qualiFilter = "";
       if (motorsport === "motogp") {
         qualiFilter = formatDateTime(closestRace.sessions.qualifying2);
@@ -251,6 +265,7 @@ module.exports = {
       } else {
         qualiFilter = formatDateTime(closestRace.sessions.qualifying);
       }
+
       const embed = new EmbedBuilder()
         .setColor(colors[motorsport])
         .setAuthor({
@@ -273,8 +288,8 @@ module.exports = {
           text: `${motorsport.toUpperCase()} - ${closestRace.name}`,
           iconURL: motorsportLogos[motorsportKey],
         });
-      if (motorsport === "indycar") {
-      } else {
+
+      if (motorsport !== "indycar") {
         embed.addFields({
           name: "Location",
           value: `${closestRace.location}`,
@@ -311,16 +326,28 @@ module.exports = {
         { name: "Grand Prix", value: `${gpFormatted}`, inline: true }
       );
 
+      if (motorsport === "f1") {
+        const driver = drivers[winnerDriver];
+        const emojiString = driver?.emoji_id.includes(":")
+          ? driver.emoji_id // Use as-is if it's already a full emoji
+          : `<:${driver?.emoji_name || "default"}:${driver?.emoji_id}>`; // Format as Discord custom emoji
+
+        embed.addFields({
+          name: "Winner",
+          value: `${emojiString} ${winnerDriver}`,
+          inline: true,
+        });
+      }
+
       await interaction.editReply({
         embeds: [embed],
         files: attachment ? [attachment] : [],
       });
     } catch (error) {
       console.error("Error fetching Grand Prix data:", error);
-      await interaction.editReply({
-        content: `There was an error fetching the Grand Prix data: ${error.message}`,
-        flags: MessageFlags.Ephemeral,
-      });
+      await interaction.editReply(
+        "There was an error fetching the Grand Prix data."
+      );
     }
   },
 };
