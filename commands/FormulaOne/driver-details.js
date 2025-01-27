@@ -66,8 +66,8 @@ module.exports = {
 
       collector.on("collect", async (i) => {
         if (i.customId === "driver-select") {
-          await i.deferUpdate();
           try {
+            await i.deferUpdate();
             const driver_number = i.values[0];
             const driverResponse = await fetch(
               `https://api.openf1.org/v1/drivers?driver_number=${driver_number}&session_key=latest`
@@ -81,34 +81,46 @@ module.exports = {
             const DriverDetailsEmbed = new EmbedBuilder()
               .setColor(driver.team_colour || "#000000")
               .setAuthor({
-                name: driver.full_name,
+                name: driver.full_name || "Unknown Driver",
                 iconURL: driver.headshot_url,
                 url: `https://www.formula1.com/en/drivers/${driver.full_name
-                  .toLowerCase()
-                  .replace(/ /g, "-")}.html`,
+                  ?.toLowerCase()
+                  .replace(/ /g, "-") || 'unknown'}.html`,
               })
               .addFields(
                 {
                   name: "Driver Number",
-                  value: `${driver.driver_number}`,
+                  value: `${driver.driver_number || 'N/A'}`,
                   inline: true,
                 },
                 {
                   name: "Broadcast Name",
-                  value: driver.broadcast_name,
+                  value: driver.broadcast_name || 'N/A',
                   inline: true,
                 },
-                { name: "Team Name", value: driver.team_name, inline: true },
-                { name: "First Name", value: driver.first_name, inline: true },
-                { name: "Last Name", value: driver.last_name, inline: true },
+                { 
+                  name: "Team Name", 
+                  value: driver.team_name || 'N/A', 
+                  inline: true 
+                },
+                { 
+                  name: "First Name", 
+                  value: driver.first_name || 'N/A', 
+                  inline: true 
+                },
+                { 
+                  name: "Last Name", 
+                  value: driver.last_name || 'N/A', 
+                  inline: true 
+                },
                 {
                   name: "Country Code",
-                  value: driver.country_code,
+                  value: driver.country_code || 'N/A',
                   inline: true,
                 }
               )
               .setThumbnail(
-                `https://media.formula1.com/image/upload/f_auto,c_limit,q_75,w_1024/content/dam/fom-website/manual/Helmets2024/${driver.last_name.toLowerCase()}.png`
+                `https://media.formula1.com/image/upload/f_auto,c_limit,q_75,w_1024/content/dam/fom-website/manual/Helmets2024/${(driver.last_name || '').toLowerCase()}.png`
               )
               .setFooter({
                 text: "Formula 1",
@@ -117,17 +129,20 @@ module.exports = {
               });
 
             await i.editReply({ embeds: [DriverDetailsEmbed], components: [] });
+            // Disable collector after successful selection
+            collector.stop();
           } catch (error) {
+            console.error("Interaction error:", error);
             await i.editReply({
               content: "Error fetching driver details. Please try again.",
               components: [],
-            });
+            }).catch(console.error);
           }
         }
       });
 
       collector.on("end", () => {
-        message.edit({ components: [] }).catch(console.error);
+        // Remove the message.edit() call that was causing the error
       });
     } catch (error) {
       console.error("Command error:", error);

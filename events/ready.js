@@ -35,7 +35,7 @@ module.exports = {
         const daysLeft = Math.ceil(
           (nextRace.date - currentDate) / (1000 * 60 * 60 * 24)
         );
-        client.user.setActivity(`${daysLeft} days until ${nextRace.name}!`);
+        client.user.setActivity(`${daysLeft} days until ${nextRace.name} GrandPrix!`);
       } else {
         client.user.setActivity("No upcoming races!");
       }

@@ -30,7 +30,7 @@ module.exports = {
         value:
           "[Support Them](https://github.com) - For assisting with code generation [💗](https://https://raw.githubusercontent.com/batuhantrkgl/easteregg-fundation/main/nothingyet.txt)",
       })
-      // .addFields({ name: 'Canvas', value: '[Support Them](https://www.npmjs.com/package/canvas) - For creating graphics and images [💗](https://)'})
+      .addFields({ name: 'Jolpi API', value: '[Support Them](https://jolpi.ca/) - For Leaderboard Data! [💗](https://)'})
       .addFields({
         name: "Discord.js",
         value:

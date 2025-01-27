@@ -36,17 +36,29 @@ module.exports = {
     ),
   async execute(interaction) {
     const motorsport = interaction.options.getString("category");
-    const year = new Date().getFullYear();
-    const url = `https://raw.githubusercontent.com/sportstimes/f1/main/_db/${motorsport}/${year}.json`;
+    const currentYear = new Date().getFullYear();
 
-    await interaction.deferReply(); // Defer the reply to give more time for processing
+    async function fetchRaceData(year) {
+      const url = `https://raw.githubusercontent.com/sportstimes/f1/main/_db/${motorsport}/${year}.json`;
+      const response = await fetch(url);
+      return response.json();
+    }
+
+    await interaction.deferReply();
 
     try {
-      const response = await fetch(url);
-      const jsonContent = await response.json();
-      const currentDate = new Date();
+      // Try current year first
+      let jsonContent;
+      try {
+        jsonContent = await fetchRaceData(currentYear);
+      } catch (error) {
+        // If current year fails, try previous year
+        jsonContent = await fetchRaceData(currentYear - 1);
+      }
 
-      // Check if there's a current Grand Prix
+      const currentDate = new Date();
+      
+      // Rest of your existing code starting from checking ongoing race
       const ongoingRace = jsonContent.races.some((race) => {
         const sessionDates = [
           race.sessions.gp,
