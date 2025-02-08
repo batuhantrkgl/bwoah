@@ -76,7 +76,7 @@ const legends = {
     'hamilton': {
         name: 'Lewis Hamilton [Mercedes Era]',
         championships: 7,
-        wins: 103,
+        wins: 104,
         podiums: 192,
         poles: 103,
         fastestLaps: 61,
@@ -85,7 +85,7 @@ const legends = {
         teams: ['McLaren', 'Mercedes', 'Ferrari'],
         years: '2007-Present',
         firstWin: '2007 Canadian Grand Prix',
-        lastWin: '2021 Saudi Arabian Grand Prix',
+        lastWin: '2024 British Grand Prix',
         nationality: 'British',
         image: 'https://raw.githubusercontent.com/batuhantrkgl/bwoah/main/assets/images/hamilton.jpg',
         description: 'Joint record holder for most World Championships, known for his exceptional qualifying pace and consistency.',

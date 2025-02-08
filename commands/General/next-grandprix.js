@@ -4,6 +4,9 @@ const {
   AttachmentBuilder,
   InteractionReplyOptions,
   MessageFlags,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
 } = require("discord.js");
 const drivers = require("../../json/drivers.json");
 const emojis = require("../../json/emojis.json");
@@ -14,6 +17,46 @@ const motogp = require("../../json/motogp.json");
 const db = require("orio.db");
 const { createCanvas, loadImage } = require("@napi-rs/canvas");
 const { DOMParser } = require("xmldom");
+
+function getWindDirection(degrees) {
+  const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  const index = Math.round(((degrees ?? 0) % 360) / 22.5);
+  return directions[index % 16];
+}
+
+async function getTrackInfo(raceName, category) {  // Add category parameter
+  try {
+    let wikiName;
+    
+    if (category === 'fe') {
+      // Handle Formula E races
+      wikiName = raceName
+        .replace(" Circuit", "")
+        .replace(/ /g, '_')
+        .replace(/^(.+)$/, "$1_ePrix");  // Use ePrix suffix for Formula E
+    } else {
+      // Handle other racing series
+      wikiName = raceName
+        .replace(" Circuit", "")
+        .replace(/ /g, '_')
+        .replace(/^(.+)$/, "$1_Grand_Prix");
+    }
+
+    const response = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${wikiName}`);
+    if (!response.ok) return { error: "Failed to load race information." };
+    
+    const data = await response.json();
+    return {
+      description: data.description || "Motor racing event",
+      extract: data.extract || "No race information available.",
+      thumbnail: data.thumbnail?.source,
+      url: data.content_urls?.desktop?.page || ""
+    };
+  } catch (error) {
+    console.error('Error fetching race info:', error);
+    return { error: "Failed to load race information." };
+  }
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -141,7 +184,7 @@ module.exports = {
           .replace(
             "Australian",
             "Australia"
-          )}_Circuit.png.transform/8col/image.png`;
+          ).replace("Chinese", "China")}_Circuit.png.transform/8col/image.png`;
       } else if (motorsport === "fe") {
         const locationKey = closestRace.location.toLowerCase();
         image = formula_e[locationKey] || "";
@@ -201,8 +244,26 @@ module.exports = {
           hour: "numeric",
           minute: "numeric",
         });
-        const timestamp = `<t:${Math.floor(date.getTime() / 1000)}:R>`;
-        return `${dateStringFormatted}, ${timeStringFormatted} (${timestamp})`;
+
+        // Calculate relative time
+        const now = new Date();
+        const diff = date.getTime() - now.getTime();
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+        let relativeTime;
+        if (days > 60) {
+          const months = Math.floor(days / 30);
+          relativeTime = `in ${months} month${months > 1 ? 's' : ''}`;
+        } else if (days > 0) {
+          relativeTime = `in ${days} day${days > 1 ? 's' : ''}`;
+        } else if (hours > 0) {
+          relativeTime = `in ${hours} hour${hours > 1 ? 's' : ''}`;
+        } else {
+          relativeTime = 'starting soon';
+        }
+
+        return `${dateStringFormatted}, ${timeStringFormatted} (${relativeTime})`;
       };
 
       const practiceFormatted = formatDateTime(closestRace.sessions.practice);
@@ -251,70 +312,193 @@ module.exports = {
       } else {
         qualiFilter = formatDateTime(closestRace.sessions.qualifying);
       }
-      const embed = new EmbedBuilder()
-        .setColor(colors[motorsport])
-        .setAuthor({
-          name: `${closestRace.slug
-            .replace(/-/g, " ")
-            .replace(/\b\w/g, (c) => c.toUpperCase())}`,
-        })
-        .addFields(
-          { name: "Round", value: `${closestRace.round}`, inline: true },
-          {
-            name: "Name",
-            value: `${closestRace.slug
-              .replace(/-/g, " ")
-              .replace(/\b\w/g, (c) => c.toUpperCase())}`,
-            inline: true,
+
+      // Add weather data fetching for F1
+      let weatherData = null;
+      if (motorsport === 'f1') {
+        try {
+          // Get races list from OpenF1 API
+          const openF1Response = await fetch('https://api.openf1.org/v1/meetings');
+          const meetings = await openF1Response.json();
+          
+          // Find the next race's meeting key
+          const nextMeeting = meetings.find(meeting => 
+            meeting.country_name === closestRace.location || 
+            meeting.meeting_name.includes(closestRace.name)
+          );
+
+          if (nextMeeting) {
+            const weatherResponse = await fetch(`https://api.openf1.org/v1/weather?meeting_key=${nextMeeting.meeting_key}`);
+            if (weatherResponse.ok) {
+              const weatherArray = await weatherResponse.json();
+              if (weatherArray.length > 0) {
+                weatherData = weatherArray[weatherArray.length - 1];
+              }
+            }
           }
-        )
-        .setImage(imageUrl)
-        .setFooter({
-          text: `${motorsport.toUpperCase()} - ${closestRace.name}`,
-          iconURL: motorsportLogos[motorsportKey],
-        });
-      if (motorsport === "indycar") {
-      } else {
-        embed.addFields({
-          name: "Location",
-          value: `${closestRace.location}`,
-          inline: true,
-        });
+        } catch (weatherError) {
+          console.error('Error fetching weather data:', weatherError);
+        }
       }
 
+      // Session times in a code block
+      let sessionFields = ['```'];  // Removed duplicate '📅 Session Schedule\n'
+      
       if (motorsport === "f2" || motorsport === "f3") {
-        embed.addFields({
-          name: "Practice",
-          value: `${practiceFormatted}`,
-          inline: true,
-        });
-      } else if (motorsport === "fe" || motorsport === "indycar") {
-        embed.addFields(
-          { name: "Practice 1", value: `${practice1Formatted}`, inline: true },
-          { name: "Practice 2", value: `${practice2Formatted}`, inline: true }
+        sessionFields.push(`Practice  : ${practiceFormatted}`);
+      } else if (motorsport === "fe" || "indycar") {
+        sessionFields.push(
+          `Practice 1: ${practice1Formatted}`,
+          `Practice 2: ${practice2Formatted}`
         );
       } else if (motorsport === "motogp" || motorsport === "f1-academy") {
-        embed.addFields(
-          { name: "Practice 1", value: `${fp1Formatted}`, inline: true },
-          { name: "Practice 2", value: `${fp2Formatted}`, inline: true }
+        sessionFields.push(
+          `Practice 1: ${fp1Formatted}`,
+          `Practice 2: ${fp2Formatted}`
         );
       } else if (motorsport === "f1") {
-        embed.addFields(
-          { name: "Free Practice 1", value: `${fp1Formatted}`, inline: true },
-          { name: "Free Practice 2", value: `${fp2Formatted}`, inline: true },
-          { name: "Free Practice 3", value: `${fp3Formatted}`, inline: true }
+        sessionFields.push(
+          `Practice 1: ${fp1Formatted}`,
+          `Practice 2: ${fp2Formatted}`,
+          `Practice 3: ${fp3Formatted}`
         );
       }
 
-      embed.addFields(
-        { name: "Qualifying", value: `${qualiFilter}`, inline: true },
-        { name: "Grand Prix", value: `${gpFormatted}`, inline: true }
+      sessionFields.push(
+        `Qualifying: ${qualiFilter}`,
+        `Race      : ${gpFormatted}`,
+        '```'
       );
 
-      await interaction.editReply({
-        embeds: [embed],
-        files: attachment ? [attachment] : [],
+      // Create pages
+      const pages = [
+        // Page 1: Race Info and Schedule
+        new EmbedBuilder()
+          .setColor(colors[motorsport])
+          .setAuthor({
+            name: `${closestRace.slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}`,
+          })
+          .addFields({
+            name: '📊 Event Information',
+            value: `\`\`\`
+Round     : ${closestRace.round}
+Name      : ${closestRace.slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+Location  : ${closestRace.location || 'N/A'}\`\`\``,
+            inline: false
+          })
+          .addFields({
+            name: '📅 Session Schedule',
+            value: sessionFields.join('\n'),
+            inline: false
+          })
+          .setFooter({
+            text: `${motorsport.toUpperCase()} - ${closestRace.name} (Page 1/2)`,
+            iconURL: motorsportLogos[motorsportKey],
+          }),
+
+        // Page 2: Track Conditions and Information
+        new EmbedBuilder()
+          .setColor(colors[motorsport])
+          .setTitle(`🏎️ ${closestRace.name} Details`)
+          .setFooter({
+            text: `${motorsport.toUpperCase()} - ${closestRace.name} (Page 2/2)`,
+            iconURL: motorsportLogos[motorsportKey],
+          })
+      ];
+
+      // Only set image if URL exists and is valid
+      if (imageUrl && imageUrl.startsWith('http')) {
+        pages[0].setImage(imageUrl);
+        pages[1].setImage(imageUrl);
+      }
+
+      // Update weather data format
+      if (weatherData) {
+        const windDirection = getWindDirection(weatherData.wind_direction);
+        pages[1].addFields({
+          name: '🌡️ Current Conditions',
+          value: `\`\`\`
+Temperature
+  Air      : ${weatherData.air_temperature?.toFixed(1)}°C
+  Track    : ${weatherData.track_temperature?.toFixed(1)}°C
+
+Conditions
+  Wind     : ${weatherData.wind_speed?.toFixed(1)} m/s ${windDirection}
+  Humidity : ${weatherData.humidity?.toFixed(0)}%
+  Rain     : ${weatherData.rainfall > 0 ? 'Yes' : 'No'}\`\`\``, 
+          inline: false
+        });
+      }
+
+      // Update Wikipedia info format with code block (update the call to include category)
+      const wikiInfo = await getTrackInfo(closestRace.name, motorsport);
+      pages[1].addFields({
+        name: '📖 Race History',
+        value: wikiInfo.error ? 
+          '```No race information available at this time. Im Sorry....```' :
+          `\`\`\`
+Description
+  ${wikiInfo.description || 'No description available'}
+
+History
+${(wikiInfo.extract || 'No detailed information available.').replace(/\. /g, '.\n').slice(0, 900)}...\`\`\`\n[📚 Read more on Wikipedia](${wikiInfo.url || 'https://wikipedia.org'})`,
+        inline: false
       });
+
+      // Create navigation buttons
+      const row = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId('prev')
+            .setLabel('Previous')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(true),
+          new ButtonBuilder()
+            .setCustomId('next')
+            .setLabel('Next')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(false)
+        );
+
+      let currentPage = 0;
+      const reply = await interaction.editReply({
+        embeds: [pages[currentPage]],
+        components: [row],
+        files: attachment ? [attachment] : []
+      });
+
+      const collector = reply.createMessageComponentCollector({
+        time: 120000
+      });
+
+      collector.on('collect', async i => {
+        if (i.user.id !== interaction.user.id) {
+          await i.reply({ content: 'This button is not for you!', ephemeral: true });
+          return;
+        }
+
+        currentPage = i.customId === 'prev' ? 0 : 1;
+
+        // Update button states
+        row.components[0].setDisabled(currentPage === 0);
+        row.components[1].setDisabled(currentPage === 1);
+
+        await i.update({
+          embeds: [pages[currentPage]],
+          components: [row],
+          files: attachment ? [attachment] : [] // Remove conditional for files
+        });
+      });
+
+      collector.on('end', async () => {
+        row.components.forEach(button => button.setDisabled(true));
+        await interaction.editReply({
+          embeds: [pages[currentPage]],
+          components: [row],
+          files: currentPage === 0 && attachment ? [attachment] : []
+        });
+      });
+
     } catch (error) {
       console.error("Error fetching Grand Prix data:", error);
       await interaction.editReply({

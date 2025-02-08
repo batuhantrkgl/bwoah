@@ -48,7 +48,7 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 let currentRaceInfo = null; // Store current race info
 
-const DEV_MODE = true; // Toggle this for development testing
+const DEV_MODE = false; // Toggle this for development testing
 const TEST_MESSAGES = [
     {
         category: 'Flag',
@@ -220,7 +220,7 @@ async function postMessage(client, message) {
         fields: [
             {
                 name: '📊 Category',
-                value: `\`${message.category || 'N/A'}\``,
+                value: `\`${message.category.toUpperCase().replace("SAFETYCAR" , "Safety-Car").replace("CAREVENT", "Car Event") || 'N/A'}\``,
                 inline: true
             }
         ],
@@ -231,10 +231,16 @@ async function postMessage(client, message) {
         timestamp: new Date(message.date)
     };
 
-    // Add DRS image for DRS messages
+    // Priority-based image setting
     if (message.category === 'Drs') {
+        // DRS messages get the DRS image
         embed.image = {
-            url: 'https://raw.githubusercontent.com/Batuhantrkgl/Bwoah/main/assets/images/F1%20-%20DRS.png'
+            url: 'https://raw.githubusercontent.com/batuhantrkgl/bwoah/refs/heads/master/assets/images/F1%20-%20DRS.png'
+        };
+    } else if (message.sector && currentRaceInfo) {
+        // Sector messages get the track image
+        embed.image = {
+            url: getTrackImageUrl(currentRaceInfo.name)
         };
     }
 
@@ -291,38 +297,6 @@ async function postMessage(client, message) {
 
     const guilds = Array.from(client.guilds.cache.values());
     console.log(`Checking ${guilds.length} guilds`);
-
-    // Add DRS image for DRS messages
-    if (message.category === 'Drs') {
-        embed.image = {
-            url: 'attachment://F1 - DRS.png'
-        };
-        const attachment = new AttachmentBuilder('./assets/images/F1 - DRS.png');
-        
-        // Update all guild sends to include the attachment
-        for (const guild of guilds) {
-            try {
-                const channelId = db.get(`logchannel_${guild.id}`);
-                console.log(`Guild ${guild.name} (${guild.id}), Channel ID:`, channelId);
-
-                if (channelId) {
-                    const channel = await guild.channels.fetch(channelId);
-                    console.log(`Found channel: ${channel?.name}`);
-
-                    if (channel && channel.isTextBased()) {
-                        await channel.send({ 
-                            embeds: [embed],
-                            files: [attachment]
-                        });
-                        console.log(`Successfully sent message to ${guild.name} #${channel.name}`);
-                    }
-                }
-            } catch (error) {
-                console.error(`Error processing guild ${guild.id}:`, error);
-            }
-        }
-        return; // Exit early since we've handled the sending
-    }
 
     // Regular non-DRS message sending
     for (const guild of guilds) {
