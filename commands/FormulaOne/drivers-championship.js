@@ -8,8 +8,8 @@ module.exports = {
   async execute(interaction) {
     try {
       await interaction.deferReply();
-
-      const response = await fetch("http://api.jolpi.ca/ergast/f1/2024/driverstandings");
+      const ThisYear = new Date().getFullYear();
+      const response = await fetch(`http://api.jolpi.ca/ergast/f1/${ThisYear}/driverstandings`);
       if (!response.ok) {
         throw new Error(`API Error: ${response.status}`);
       }
@@ -35,7 +35,7 @@ async function showStandings(interaction, standings, currentPage) {
   const currentStandings = standings.slice(start, end);
 
   const embed = new EmbedBuilder()
-    .setTitle(`2024 Formula 1 Driver's Championship Standings (Page ${currentPage + 1}/${maxPages})`)
+    .setTitle(`${ThisYear} Formula 1 Driver's Championship Standings (Page ${currentPage + 1}/${maxPages})`)
     .setColor("#ff1801")
     .setTimestamp()
     .setFooter({
@@ -91,7 +91,7 @@ async function showStandings(interaction, standings, currentPage) {
     
     // Create new embed and row for the new page
     const newEmbed = new EmbedBuilder()
-      .setTitle(`2024 Formula 1 Driver's Championship Standings (Page ${newPage + 1}/${maxPages})`)
+      .setTitle(`${ThisYear} Formula 1 Driver's Championship Standings (Page ${newPage + 1}/${maxPages})`)
       .setColor("#ff1801")
       .setTimestamp()
       .setFooter({
