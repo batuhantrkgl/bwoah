@@ -23,15 +23,16 @@
   },
   "homepage": "https://github.com/batuhantrkgl/bwoah#readme",
   "dependencies": {
-    "@napi-rs/canvas": "^0.1.62",
-    "@types/node": "^20.12.13",
-    "cheerio": "^1.0.0",
-    "discord.js": "^14.15.2",
-    "dotenv": "^16.4.5",
-    "node": "^20.14.0",
+    "@napi-rs/canvas": "^0.1.77",
+    "@types/node": "^24.3.0",
+    "blessed": "^0.1.81",
+    "cheerio": "^1.1.2",
+    "discord.js": "^14.22.1",
+    "dotenv": "^17.2.1",
+    "jsdom": "^26.1.0",
+    "node": "^24.6.0",
     "node-fetch": "^3.3.2",
     "orio.db": "^3.1.2",
-    "xmldom": "^0.6.0",
-    "blessed": "^0.1.81"
+    "xmldom": "^0.6.0"
   }
 }

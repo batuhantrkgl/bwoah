@@ -1,6 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } = require('discord.js');
 const db = require('orio.db');
-const fetch = require('node-fetch');
+// Bun has native fetch support, no need to import node-fetch
 
 let messageQueue = new Set();
 const REFRESH_INTERVAL = 2000; // 2 seconds
@@ -127,8 +127,13 @@ async function getCurrentRace() {
         const year = new Date().getFullYear();
         const url = `https://raw.githubusercontent.com/sportstimes/f1/main/_db/f1/${year}.json`;
         const response = await fetch(url);
-        const data = await response.json();
         
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+
         const now = new Date();
         const currentRace = data.races.find(race => {
             const raceDate = new Date(race.sessions.gp);
@@ -160,16 +165,21 @@ function getTrackImageUrl(raceName) {
 
 async function fetchRaceControl() {
     const url = 'https://api.openf1.org/v1/race_control?meeting_key=latest';
-    
+
     try {
         const response = await fetch(url);
-        const data = await response.json();
         
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+
         // Only get messages after our last processed timestamp
         if (lastProcessedTimestamp) {
             return data.filter(msg => new Date(msg.date) > new Date(lastProcessedTimestamp));
         }
-        
+
         // On first run, just set the timestamp without returning messages
         if (data.length > 0) {
             lastProcessedTimestamp = data[data.length - 1].date;
@@ -184,14 +194,14 @@ async function fetchRaceControl() {
 async function postMessage(client, message) {
     console.log('Processing message:', message.message);
     const messageKey = `${message.date}_${message.message}`;
-    
+
     if (messageQueue.has(messageKey)) return;
     messageQueue.add(messageKey);
 
     // Determine embed color and icon based on category and flag
     let embedColor = FLAG_COLORS.DEFAULT;
     let categoryIcon = '🏎️';
-    
+
     if (message.flag && FLAG_COLORS[message.flag]) {
         embedColor = FLAG_COLORS[message.flag];
     }
@@ -433,7 +443,7 @@ module.exports = {
 
         // Initial race info fetch
         currentRaceInfo = await getCurrentRace();
-        
+
         // Update race info every 5 minutes
         setInterval(async () => {
             currentRaceInfo = await getCurrentRace();
@@ -468,7 +478,7 @@ module.exports = {
             for (const message of TEST_MESSAGES) {
                 await postMessage(client, message);
                 raceMessages.push(message);
-                
+
                 if (message.flag === 'CHEQUERED') {
                     console.log('Race ended, creating summary...');
                     await createRaceSummary(client, raceMessages);
@@ -479,13 +489,13 @@ module.exports = {
         } else {
             // Initialize by fetching current state without sending messages
             await fetchRaceControl();
-            
+
             setInterval(async () => {
                 const messages = await fetchRaceControl();
                 for (const message of messages) {
                     await postMessage(client, message);
                     raceMessages.push(message);
-                    
+
                     if (message.flag === 'CHEQUERED') {
                         console.log('Race ended, creating summary...');
                         await createRaceSummary(client, raceMessages);
